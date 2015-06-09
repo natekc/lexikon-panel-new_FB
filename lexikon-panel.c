@@ -42,7 +42,6 @@
 #define PANEL_LEXIKON_SHARP_CUT2        (PANEL_LEXIKON_SHARP | DRIVER_IC_CUT2)
 #define PANEL_LEXIKON_SONY_CUT2         (PANEL_LEXIKON_SONY | DRIVER_IC_CUT2)
 
-extern int panel_type;
 static struct vreg *V_LCMIO_1V8, *V_LCM_2V85;
 
 static int mddi_novatec_power(u32 on)
