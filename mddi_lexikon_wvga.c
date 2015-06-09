@@ -606,13 +606,12 @@ static int __init lexikonwvga_init(void)
     pinfo->lcd.v_pulse_width = 4; // vivo sony
 
     ret = platform_device_register(&this_device);
-	if (ret) 
+    if (ret) 
     {
-		printk(KERN_ERR "%s not able to register the device\n",
-			__func__);
-		platform_driver_unregister(&this_driver);
-	}
-
+        printk(KERN_ERR "%s not able to register the device\n",
+            __func__);
+        platform_device_unregister(&this_device);
+    }
 	return ret;
 }
 
@@ -624,10 +623,9 @@ static int __init lexikon_backlight_init(void)
     {
         printk(KERN_ERR "%s not able to register the device\n",
             __func__);
-        platform_device_unregister(&lexikon_backlight_driver);
-        return ret;
+        platform_driver_unregister(&lexikon_backlight_driver);
     }
-    return 0;
+    return ret;
 }
 
 device_initcall(lexikonwvga_init);
