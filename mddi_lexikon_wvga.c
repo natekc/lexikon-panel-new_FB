@@ -60,18 +60,18 @@ static int client_auto_hibernate(int on) {
 #endif
 
 enum {
-	PANEL_LEXIKON_SHARP,
+    PANEL_LEXIKON_SHARP,
     PANEL_LEXIKON_SHARP_CUT2,
-	PANEL_LEXIKON_SONY,
-	PANEL_LEXIKON_SHARP_CUT2,
+    PANEL_LEXIKON_SONY,
+    PANEL_LEXIKON_SHARP_CUT2,
     PANEL_UNKNOWN
 };
 
 #define REG_WAIT (0xffff)
 
 static struct nov_regs {
-	unsigned reg;
-	unsigned val;
+    unsigned reg;
+    unsigned val;
 };
 
 static struct nov_regs sharp_init_seq[] = {
@@ -376,14 +376,16 @@ static int write_seq(struct nov_regs *cmd_table, unsigned array_size)
 {
     int i;
 
-    for (i = 0; i < array_size; i++) {
-        if (cmd_table[i].reg == REG_WAIT) {
+    for (i = 0; i < array_size; i++)
+    {
+        if (cmd_table[i].reg == REG_WAIT)
+        {
             msleep(cmd_table[i].val);
             continue;
         } 
         write_client_reg(cmd_table[i].val, cmd_table[i].reg);
         if (reg == 0x1100)
-            mddi_host_reg_out(CMD, MDDI_CMD_POWERDOWN);
+        mddi_host_reg_out(CMD, MDDI_CMD_POWERDOWN);
     }
     return 0;
 }
@@ -392,23 +394,24 @@ static int lexikon_panel_init(void)
 {
 
     mutex_lock(&panel_lock);
-    
-    switch (panel_type) {
+
+    switch (panel_type) 
+    {
         case PANEL_LEXIKON_SHARP:
         case PANEL_LEXIKON_SHARP_CUT2:
             write_seq(sharp_init_seq, ARRAY_SIZE(sharp_init_seq));
-            break;
+        break;
         case PANEL_LEXIKON_SONY:
         case PANEL_LEXIKON_SONY_CUT2:
             write_seq(sony_init_seq, ARRAY_SIZE(sony_init_seq));
-            break;
+        break;
         default:
             printk(KERN_ERR "%s Unknown panel! \n", __func__);
     }
 
-	mutex_unlock(&panel_lock);
+    mutex_unlock(&panel_lock);
 
-	return 0;
+    return 0;
 }
 
 static int mddi_lexikon_panel_on(struct platform_device *pdev)
@@ -419,12 +422,12 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
 
     // resume before unblank
     lexikon_panel_init();
-	atomic_set(&bl_ready, 1);
+    atomic_set(&bl_ready, 1);
 
     /* Enable dim */
-	write_client_reg(0x24, 0x5300);
-	write_client_reg(0x0A, 0x22C0);
-	msleep(30);
+    write_client_reg(0x24, 0x5300);
+    write_client_reg(0x0A, 0x22C0);
+    msleep(30);
     lexikon_adjust_backlight(last_val);
 
     return 0;
@@ -435,36 +438,13 @@ static int mddi_lexikon_panel_off(struct platform_device *pdev)
     printk(KERN_DEBUG "[BL] Turning off\n");
     screen_on = false;
 
-	/* set dim off for performance */
-	write_client_reg(0x0, 0x5300);
-	lexikon_adjust_backlight(LED_OFF);
-	write_client_reg(0, 0x2800);
-	write_client_reg(0, 0x1000);
+    /* set dim off for performance */
+    write_client_reg(0x0, 0x5300);
+    lexikon_adjust_backlight(LED_OFF);
+    write_client_reg(0, 0x2800);
+    write_client_reg(0, 0x1000);
     atomic_set(&bl_ready, 0);
     return 0;
-}
-
-static int lexikon_shrink_pwm(int brightness, int user_def,
-		int user_min, int user_max, int panel_def,
-		int panel_min, int panel_max)
-{
-	if (brightness < user_min) {
-		return panel_min;
-	}
-
-	if (brightness > user_def) {
-		brightness = (panel_max - panel_def) *
-			(brightness - user_def) /
-			(user_max - user_def) +
-			panel_def;
-	} else {
-			brightness = (panel_def - panel_min) *
-			(brightness - user_min) /
-			(user_def - user_min) +
-			panel_min;
-	}
-
-    return brightness;
 }
 
 static int lexikon_adjust_backlight(enum led_brightness val)
@@ -474,30 +454,39 @@ static int lexikon_adjust_backlight(enum led_brightness val)
 	if (atomic_read(&bl_ready) == 0)
 		return;
 
-	shrink_br = lexikon_shrink_pwm(val, PWM_USER_DEF,
-			PWM_USER_MIN, PWM_USER_MAX, PWM_PANEL_DEF,
-			PWM_PANEL_MIN, PWM_PANEL_MAX);
+    if (val == 0)
+        shrink_br = 0;
+    else if (val < 30)
+        shrink_br = 9;
+    else if ((val >= 30) && (val < 83))
+        shrink_br = 46 * (val - 30) / 53 + 9;
+    else if ((val >= 83) && (val < 142))
+        shrink_br = 54 * (val - 83) / 59 + 55;
+    else
+        shrink_br = 146 * (val - 142) / 113 + 109;
 
-    if (last_val == shrink_br) {
+    if (last_val == shrink_br)
+    {
         printk(KERN_DEBUG "[BL] Skipping identical br. %d\n", shrink_br);
         return;
     }
 
 	mutex_lock(&panel_lock);
 
-	if (lexikon_set_dim == 1) {
-		write_client_reg(0x2C, 0x5300);
-		/* we dont need set dim again */
-		lexikon_set_dim = 0;
-	}
+    if (lexikon_set_dim == 1)
+    {
+        write_client_reg(0x2C, 0x5300);
+        /* we dont need set dim again */
+        lexikon_set_dim = 0;
+    }
 
     printk(KERN_DEBUG "[BL] Setting bl to %d\n", shrink_br);    
 
-	write_client_reg(0x00, 0x5500);
-	write_client_reg(shrink_br, 0x5100);
-	last_val = shrink_br;
+    write_client_reg(0x00, 0x5500);
+    write_client_reg(shrink_br, 0x5100);
+    last_val = shrink_br;
 
-	mutex_unlock(&panel_lock);
+    mutex_unlock(&panel_lock);
 
     return shrink_br;
 }
@@ -511,14 +500,15 @@ lexikon_get_brightness(struct led_classdev *led_cdev)
 static void lexikon_brightness_set(struct led_classdev *led_cdev,
     enum led_brightness val)
 {
-    if (!screen_on) {
+    if (!screen_on)
+    {
         printk(KERN_DEBUG "[BL] Screen is off, ignoring val=%d \n", val);
         return;
     }
 
     led_cdev->brightness = lexikon_adjust_brightness(val);
-	/* set next backlight value with dim */
-	lexikon_set_dim = 1;
+    /* set next backlight value with dim */
+    lexikon_set_dim = 1;
 }
 
 static struct led_classdev lexikon_backlight_led = {
@@ -532,7 +522,8 @@ static int lexikon_backlight_probe(struct platform_device *pdev)
     int rc;
 
     rc = led_classdev_register(&pdev->dev, &lexikon_backlight_led);
-    if (rc) { 
+    if (rc)
+    { 
         printk(KERN_ERR "%s +\n", __func__);
         led_classdev_unregister(&lexikon_backlight_led);
         return rc;
@@ -554,16 +545,17 @@ static struct platform_driver lexikon_backlight_driver = {
 
 static int lexikonwvga_probe(struct platform_device *pdev)
 {
-	pr_info("%s: id=%d\n", __func__, pdev->id);
+    pr_info("%s: id=%d\n", __func__, pdev->id);
 
     int ret;
     struct msm_panel_common_pdata *mddi_lexikonwvga_pdata;
 
-	wake_lock_init(&panel_idle_lock, WAKE_LOCK_SUSPEND,
-			"backlight_present");
+    wake_lock_init(&panel_idle_lock, WAKE_LOCK_SUSPEND,
+            "backlight_present");
 
-	ret = platform_device_register(&lexikon_backlight);
-    if (ret) {
+    ret = platform_device_register(&lexikon_backlight);
+    if (ret)
+    {
         printk(KERN_ERR "%s fail %d\n", __func__, rc);
         platform_device_unregister(&lexikon_backlight);
         return ret;
@@ -581,52 +573,54 @@ static struct platform_driver this_driver = {
 };
 
 static struct msm_fb_panel_data lexikonwvga_panel_data= {
-	.on = mddi_lexikon_panel_on,
-	.off = mddi_lexikon_panel_off,
+    .on = mddi_lexikon_panel_on,
+    .off = mddi_lexikon_panel_off,
 };
 
 static struct platform_device this_device = {
-	.name	= "mddi_lexikon_wvga",
-	.id	= 1,
-	.dev	= {
-		.platform_data = &lexikonwvga_panel_data,
-	},
+    .name	= "mddi_lexikon_wvga",
+    .id	= 1,
+    .dev	= {
+        .platform_data = &lexikonwvga_panel_data,
+    },
 };
 
 static int __init lexikonwvga_init(void)
 {
-	int ret;
-	struct msm_panel_info *pinfo;
+    int ret;
+    struct msm_panel_info *pinfo;
 
-	u32 id;
-	ret = msm_fb_detect_client("mddi_lexikon_wvga");
-	if (ret == -ENODEV)
-		return 0;
+    u32 id;
+    ret = msm_fb_detect_client("mddi_lexikon_wvga");
+    if (ret == -ENODEV)
+        return 0;
 
-	ret = platform_driver_register(&this_driver);
-	if (ret) {
-		pr_err("%s: driver register failed, rc=%d\n", __func__, ret);
-		return ret;
-	}
+    ret = platform_driver_register(&this_driver);
+    if (ret) 
+    {
+        pr_err("%s: driver register failed, rc=%d\n", __func__, ret);
+        return ret;
+    }
 
-	pinfo = &lexikonwvga_panel_data.panel_info;
-	pinfo->xres = 480;
-	pinfo->yres = 800;
-	pinfo->type = MDDI_PANEL;
-	pinfo->pdest = DISPLAY_1;
+    pinfo = &lexikonwvga_panel_data.panel_info;
+    pinfo->xres = 480;
+    pinfo->yres = 800;
+    pinfo->type = MDDI_PANEL;
+    pinfo->pdest = DISPLAY_1;
     pinfo->mddi.vdopkt = MDDI_DEFAULT_PRIM_PIX_ATTR;
-	pinfo->wait_cycle = 0;
-	pinfo->bpp = 16; // as defined by HTC
-	pinfo->fb_num = 2; // or 3?
+    pinfo->wait_cycle = 0;
+    pinfo->bpp = 16; // as defined by HTC
+    pinfo->fb_num = 2; // or 3?
     pinfo->clk_rate = 192000000;
     pinfo->clk_min  = 192000000; // when scaled, is 384000000
     pinfo->clk_max  = 200000000;
-	pinfo->lcd.v_back_porch = 4; // vivo sony
-	pinfo->lcd.v_front_porch = 2; // vivo sony
-	pinfo->lcd.v_pulse_width = 4; // vivo sony
+    pinfo->lcd.v_back_porch = 4; // vivo sony
+    pinfo->lcd.v_front_porch = 2; // vivo sony
+    pinfo->lcd.v_pulse_width = 4; // vivo sony
 
-	ret = platform_device_register(&this_device);
-	if (ret) {
+    ret = platform_device_register(&this_device);
+	if (ret) 
+    {
 		printk(KERN_ERR "%s not able to register the device\n",
 			__func__);
 		platform_driver_unregister(&this_driver);
@@ -639,9 +633,10 @@ static int __init lexikon_backlight_init(void)
 {
     int ret;
     ret = platform_driver_register(&lexikon_backlight_driver);
-    if (ret) {
-		printk(KERN_ERR "%s not able to register the device\n",
-			__func__);
+    if (ret) 
+    {
+        printk(KERN_ERR "%s not able to register the device\n",
+            __func__);
         platform_device_unregister(&lexikon_backlight_driver);
         return ret;
     }

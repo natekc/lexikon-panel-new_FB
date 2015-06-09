@@ -117,8 +117,8 @@ static int msm_fb_mddi_sel_clk(u32 *clk_rate)
 
 static struct mddi_platform_data mddi_pdata = {
     .mddi_power_save = mddi_novatec_power,
-	.mddi_sel_clk = msm_fb_mddi_sel_clk,
-	.mddi_client_power = NULL, // mddi_novatec_power,
+    .mddi_sel_clk = msm_fb_mddi_sel_clk,
+    .mddi_client_power = NULL, // mddi_novatec_power,
 };
 
 static struct msm_panel_common_pdata mdp_pdata = {
@@ -130,16 +130,16 @@ static struct msm_panel_common_pdata mdp_pdata = {
 
 static void __init msm_fb_add_devices(void)
 {
-	msm_fb_register_device("mdp", &mdp_pdata);
-	msm_fb_register_device("pmdh", &mddi_pdata);
+    msm_fb_register_device("mdp", &mdp_pdata);
+    msm_fb_register_device("pmdh", &mddi_pdata);
 }
 
 void __init lexikon_init_panel(unsigned int sys_rev)
 {
-	int rc;
+    int rc;
 
     panel_init_power();
     msm_fb_add_devices();
 
-	return 0;
+    return 0;
 }
