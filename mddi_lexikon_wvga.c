@@ -32,16 +32,6 @@
 
 #define write_client_reg(val, reg) mddi_queue_register_write(reg, val, FALSE, 0);
 
-#define PWM_USER_DEF	 		143
-#define PWM_USER_MIN			30
-#define PWM_USER_MAX			255
-
-#define PWM_PANEL_DEF			135
-#define PWM_PANEL_MIN			9
-#define PWM_PANEL_MAX			255
-
-#define DEFAULT_BRIGHTNESS_LEVEL PWM_USER_DEF
-
 static int lexikon_adjust_backlight(enum led_brightness val);
 
 extern int panel_type;
@@ -59,12 +49,12 @@ static int client_auto_hibernate(int on) {
 }
 #endif
 
+// DRIVER_IC_CUT2 = 4
 enum {
-    PANEL_LEXIKON_SHARP,
-    PANEL_LEXIKON_SHARP_CUT2,
-    PANEL_LEXIKON_SONY,
-    PANEL_LEXIKON_SHARP_CUT2,
-    PANEL_UNKNOWN
+    PANEL_LEXIKON_SHARP = 1,
+    PANEL_LEXIKON_SHARP_CUT2 = 5, // PANEL_LEXIKON_SONY | DRIVER_IC_CUT2
+    PANEL_LEXIKON_SONY = 2,
+    PANEL_LEXIKON_SONY_CUT2 = 6, // PANEL_LEXIKON_SHARP | DRIVER_IC_CUT2
 };
 
 #define REG_WAIT (0xffff)
@@ -385,7 +375,7 @@ static int write_seq(struct nov_regs *cmd_table, unsigned array_size)
         } 
         write_client_reg(cmd_table[i].val, cmd_table[i].reg);
         if (reg == 0x1100)
-        mddi_host_reg_out(CMD, MDDI_CMD_POWERDOWN);
+            mddi_host_reg_out(CMD, MDDI_CMD_POWERDOWN);
     }
     return 0;
 }
