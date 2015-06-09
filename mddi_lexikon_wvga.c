@@ -42,13 +42,6 @@ static bool screen_on = true;
 /* use one flag to have better backlight on/off performance */
 static int lexikon_set_dim = 1;
 
-#if 0
-static int client_auto_hibernate(int on) {
-    mddi_host_reg_out(CMD, MDDI_CMD_HIBERNATE | !!on);
-    return 0;
-}
-#endif
-
 // DRIVER_IC_CUT2 = 4
 enum {
     PANEL_LEXIKON_SHARP = 1,
@@ -410,6 +403,7 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     printk(KERN_DEBUG "[BL] Turning on\n");
     screen_on = true;
 
+    mddi_host_disable_hibernation(true);
     // resume before unblank
     lexikon_panel_init();
     atomic_set(&bl_ready, 1);
@@ -419,6 +413,7 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     write_client_reg(0x0A, 0x22C0);
     msleep(30);
     lexikon_adjust_backlight(last_val);
+    mddi_host_disable_hibernation(false);
 
     return 0;
 }
@@ -428,11 +423,13 @@ static int mddi_lexikon_panel_off(struct platform_device *pdev)
     printk(KERN_DEBUG "[BL] Turning off\n");
     screen_on = false;
 
+    mddi_host_disable_hibernation(true);
     /* set dim off for performance */
     write_client_reg(0x0, 0x5300);
     lexikon_adjust_backlight(LED_OFF);
     write_client_reg(0, 0x2800);
     write_client_reg(0, 0x1000);
+    mddi_host_disable_hibernation(false);
     atomic_set(&bl_ready, 0);
     return 0;
 }
