@@ -37,7 +37,7 @@
 
 static struct vreg *V_LCMIO_1V8, *V_LCM_2V85;
 
-static int mddi_novatec_power(u32 on)
+static int mddi_novatec_power(int on)
 {
 	int rc;
 	unsigned config;
