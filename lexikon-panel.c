@@ -25,7 +25,7 @@
 
 #include <asm/io.h>
 #include <asm/mach-types.h>
-#include <mach/msm_fb-7x30.h>
+#include <mach/msm_fb.h>
 #include <mach/msm_iomap.h>
 #include <mach/vreg.h>
 #include <mach/panel_id.h>
@@ -34,6 +34,11 @@
 #include "../devices.h"
 #include "../proc_comm.h"
 #include "../../../../drivers/video/msm/mdp_hw.h"
+
+int device_fb_detect_panel(const char *name)
+{
+    return 0;
+}
 
 static struct vreg *V_LCMIO_1V8, *V_LCM_2V85;
 
@@ -78,7 +83,7 @@ static int mddi_novatec_power(int on)
     return 0;
 }
 
-int panel_init_power(void) 
+int panel_init_power(int sys_rev) 
 {
 	/* lcd panel power */
 	/* 2.85V -- LDO20 */
@@ -99,6 +104,7 @@ int panel_init_power(void)
 		       __func__, PTR_ERR(V_LCMIO_1V8));
 		return -1;
 	}
+    return 0;
 }
 
 static int msm_fb_mddi_sel_clk(u32 *clk_rate)
@@ -110,7 +116,6 @@ static int msm_fb_mddi_sel_clk(u32 *clk_rate)
 static struct mddi_platform_data mddi_pdata = {
     .mddi_power_save = mddi_novatec_power,
     .mddi_sel_clk = msm_fb_mddi_sel_clk,
-    .mddi_client_power = NULL, // mddi_novatec_power,
 };
 
 static struct msm_panel_common_pdata mdp_pdata = {
@@ -120,18 +125,19 @@ static struct msm_panel_common_pdata mdp_pdata = {
     .mdp_rev = MDP_REV_40,
 };
 
-static void __init msm_fb_add_devices(void)
-{
-    msm_fb_register_device("mdp", &mdp_pdata);
-    msm_fb_register_device("pmdh", &mddi_pdata);
-}
+struct msm_list_device lexikon_fb_devices[] = {
+  { "mdp", &mdp_pdata },
+  { "pmdh", &mddi_pdata },
+};
 
-void __init lexikon_init_panel(unsigned int sys_rev)
+int __init lexikon_init_panel(unsigned int sys_rev)
 {
-    int rc;
+    int ret;
+    ret = panel_init_power(sys_rev);
+    if (ret)
+        return ret;
 
-    panel_init_power();
-    msm_fb_add_devices();
+    msm_fb_add_devices(lexikon_fb_devices, ARRAY_SIZE(lexikon_fb_devices));
 
     return 0;
 }
