@@ -577,9 +577,11 @@ static int __init lexikonwvga_init(void)
 {
     int ret;
     struct msm_panel_info *pinfo;
-
+    
+#if 0
     if (msm_fb_detect_client("mddi_lexikon_wvga"))
         return 0;
+#endif
 
     ret = platform_driver_register(&this_driver);
     if (ret) 
