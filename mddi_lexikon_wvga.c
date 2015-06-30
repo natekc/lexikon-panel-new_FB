@@ -406,6 +406,8 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     screen_on = true;
 
     mddi_host_disable_hibernation(true);
+    // enable time to disable hibernation
+    msleep(5);
     // resume before unblank
     lexikon_panel_init();
     atomic_set(&bl_ready, 1);
@@ -492,6 +494,8 @@ static void lexikon_set_brightness(struct led_classdev *led_cdev,
         printk(KERN_DEBUG "[BL] Screen is off, ignoring val=%d \n", val);
         return;
     }
+    if (val == 0)
+        val = LED_FULL;
     lexikon_adjust_backlight(val);
     led_cdev->brightness = last_val;
     /* set next backlight value with dim */
@@ -577,11 +581,6 @@ static int __init lexikonwvga_init(void)
 {
     int ret;
     struct msm_panel_info *pinfo;
-    
-#if 0
-    if (msm_fb_detect_client("mddi_lexikon_wvga"))
-        return 0;
-#endif
 
     ret = platform_driver_register(&this_driver);
     if (ret) 
@@ -601,7 +600,7 @@ static int __init lexikonwvga_init(void)
     pinfo->fb_num = 2; // or 3?
     pinfo->clk_rate = 192000000;
     pinfo->clk_min  = 192000000; // when scaled, is 384000000
-    pinfo->clk_max  = 200000000;
+    pinfo->clk_max  = 192000000;
     pinfo->lcd.v_back_porch = 4; // vivo sony
     pinfo->lcd.v_front_porch = 2; // vivo sony
     pinfo->lcd.v_pulse_width = 4; // vivo sony
