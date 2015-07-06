@@ -30,18 +30,17 @@
 #include "mddihost.h" 
 #include "mddihosti.h"
 
-#define write_client_reg(val, reg) mddi_queue_register_write(reg, val, FALSE, 0);
+#define write_client_reg(val, reg) mddi_queue_register_write(reg, val, TRUE, 0);
 
-static void lexikon_adjust_backlight(enum led_brightness val);
+static unsigned int lexikon_adjust_backlight(enum led_brightness val);
 
 extern int panel_type;
 static DEFINE_MUTEX(panel_lock);
 static struct wake_lock panel_idle_lock;
 static atomic_t bl_ready = ATOMIC_INIT(1);
-static uint8_t last_val = LED_FULL;
-static bool screen_on = true;
+static uint8_t last_val = LED_HALF;
 /* use one flag to have better backlight on/off performance */
-static int lexikon_set_dim = 1;
+static int lexikon_set_dim = 0;
 
 // DRIVER_IC_CUT2 = 4
 enum {
@@ -403,47 +402,38 @@ static int lexikon_panel_init(void)
 static int mddi_lexikon_panel_on(struct platform_device *pdev)
 {
     printk(KERN_DEBUG "[BL] Turning on\n");
-    screen_on = true;
-
     mddi_host_disable_hibernation(true);
-    // enable time to disable hibernation
-    msleep(5);
-    // resume before unblank
+    mddi_host_client_cnt_reset();
     lexikon_panel_init();
     atomic_set(&bl_ready, 1);
-
-    /* Enable dim */
     write_client_reg(0x24, 0x5300);
     write_client_reg(0x0A, 0x22C0);
     msleep(30);
-    lexikon_adjust_backlight(last_val);
+    lexikon_adjust_backlight(LED_HALF);
     mddi_host_disable_hibernation(false);
-
+    /* Enable dim for next update */
+    lexikon_set_dim = 1;
     return 0;
 }
 
 static int mddi_lexikon_panel_off(struct platform_device *pdev)
 {
     printk(KERN_DEBUG "[BL] Turning off\n");
-    screen_on = false;
-
     mddi_host_disable_hibernation(true);
     /* set dim off for performance */
     write_client_reg(0x0, 0x5300);
     lexikon_adjust_backlight(LED_OFF);
     write_client_reg(0, 0x2800);
     write_client_reg(0, 0x1000);
-    mddi_host_disable_hibernation(false);
     atomic_set(&bl_ready, 0);
+    mddi_host_disable_hibernation(false);
     return 0;
 }
 
-static void lexikon_adjust_backlight(enum led_brightness val)
+static unsigned int lexikon_adjust_backlight(enum led_brightness val)
 {
 	unsigned int shrink_br;
-
-	if (atomic_read(&bl_ready) == 0)
-		return;
+	mutex_lock(&panel_lock);
 
     if (val == 0)
         shrink_br = 0;
@@ -456,14 +446,6 @@ static void lexikon_adjust_backlight(enum led_brightness val)
     else
         shrink_br = 146 * (val - 142) / 113 + 109;
 
-    if (last_val == shrink_br)
-    {
-        printk(KERN_DEBUG "[BL] Skipping identical br. %d\n", shrink_br);
-        return;
-    }
-
-	mutex_lock(&panel_lock);
-
     if (lexikon_set_dim == 1)
     {
         write_client_reg(0x2C, 0x5300);
@@ -475,36 +457,30 @@ static void lexikon_adjust_backlight(enum led_brightness val)
 
     write_client_reg(0x00, 0x5500);
     write_client_reg(shrink_br, 0x5100);
+
     last_val = shrink_br;
 
     mutex_unlock(&panel_lock);
-}
-
-static enum led_brightness
-lexikon_get_brightness(struct led_classdev *led_cdev)
-{
-    return last_val;
+    return shrink_br;
 }
 
 static void lexikon_set_brightness(struct led_classdev *led_cdev,
     enum led_brightness val)
 {
-    if (!screen_on)
-    {
-        printk(KERN_DEBUG "[BL] Screen is off, ignoring val=%d \n", val);
-        return;
-    }
-    if (val == 0)
-        val = LED_FULL;
-    lexikon_adjust_backlight(val);
-    led_cdev->brightness = last_val;
-    /* set next backlight value with dim */
-    lexikon_set_dim = 1;
+	if (atomic_read(&bl_ready) == 0) {
+		printk(KERN_DEBUG "[BL] Not ready, val=%d\n", val);
+		return;
+	}
+    // TODO: backlight does not work.  Setting to levels ~76 will cause
+    // device reboot.
+#if 0
+    led_cdev->brightness = lexikon_adjust_backlight(val);
+#endif
 }
 
 static struct led_classdev lexikon_backlight_led = {
     .name           = "lcd-backlight",
-    .brightness_get = lexikon_get_brightness,
+	.brightness = LED_FULL,
     .brightness_set = lexikon_set_brightness,
 };
 
@@ -514,7 +490,7 @@ static int lexikon_backlight_probe(struct platform_device *pdev)
 
     rc = led_classdev_register(&pdev->dev, &lexikon_backlight_led);
     if (rc)
-    { 
+    {
         printk(KERN_ERR "%s +\n", __func__);
         led_classdev_unregister(&lexikon_backlight_led);
         return rc;
@@ -592,6 +568,7 @@ static int __init lexikonwvga_init(void)
     pinfo = &lexikonwvga_panel_data.panel_info;
     pinfo->xres = 480;
     pinfo->yres = 800;
+    pinfo->lcd.rev = 2; // mddi type II
     pinfo->type = MDDI_PANEL;
     pinfo->pdest = DISPLAY_1;
     pinfo->mddi.vdopkt = MDDI_DEFAULT_PRIM_PIX_ATTR;
