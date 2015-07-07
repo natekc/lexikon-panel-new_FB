@@ -32,8 +32,6 @@
 
 #define write_client_reg(val, reg) mddi_queue_register_write(reg, val, TRUE, 0);
 
-static unsigned int lexikon_adjust_backlight(enum led_brightness val);
-
 extern int panel_type;
 static DEFINE_MUTEX(panel_lock);
 static struct wake_lock panel_idle_lock;
@@ -228,6 +226,12 @@ static struct nov_regs sharp_init_seq[] = {
 	{0x3500, 0x00},
 	{0x4400, 0x02},
 	{0x4401, 0x58},
+    {0x5300, 0x24},// half dim
+    {0x22C0, 0x0A},// unblank screen
+    {REG_WAIT, 30},
+    {0x5500, 0x00},
+    {0x5100, LED_HALF},// set initial backlight
+    {0x5300, 0x2C},// full dim
 };
 
 static struct nov_regs sony_init_seq[] = {
@@ -351,6 +355,20 @@ static struct nov_regs sony_init_seq[] = {
 	{0x3500, 0x00},
 	{0x4400, 0x02},
 	{0x4401, 0x58},
+    {0x5300, 0x24},// half dim
+    {0x22C0, 0x0A},// unblank screen
+    {REG_WAIT, 30},
+    {0x5500, 0x00},
+    {0x5100, LED_HALF},// set initial backlight, last_val ? 
+    {0x5300, 0x2C},// full dim
+};
+
+static struct nov_regs uninit_seq[] = {
+    {0x5300, 0x00},// dim off
+    {0x5500, 0x00},
+    {0x5100, 0x00},//bl=0
+    {0x2800, 0x00},
+    {0x1000, 0x00},
 };
 
 static int write_seq(struct nov_regs *cmd_table, unsigned array_size)
@@ -375,9 +393,6 @@ static int write_seq(struct nov_regs *cmd_table, unsigned array_size)
 
 static int lexikon_panel_init(void)
 {
-
-    mutex_lock(&panel_lock);
-
     switch (panel_type) 
     {
         case PANEL_LEXIKON_SHARP:
@@ -391,39 +406,39 @@ static int lexikon_panel_init(void)
         default:
             printk(KERN_ERR "%s Unknown panel! \n", __func__);
     }
+    return 0;
+}
 
-    mutex_unlock(&panel_lock);
-
+static int lexikon_panel_uninit(void)
+{
+    write_seq(uninit_seq, ARRAY_SIZE(uninit_seq));
     return 0;
 }
 
 static int mddi_lexikon_panel_on(struct platform_device *pdev)
 {
     printk(KERN_DEBUG "[mddi] Turning on\n");
+    mutex_lock(&panel_lock);
     mddi_host_disable_hibernation(true);
     mddi_host_client_cnt_reset();
     lexikon_panel_init();
-    write_client_reg(0x24, 0x5300);
-    write_client_reg(0x0A, 0x22C0);
-    msleep(30);
+    // mddi is on, start accepting android bl values
     atomic_set(&bl_ready, 1);
-    lexikon_adjust_backlight(LED_HALF);
-    write_client_reg(0x2C, 0x5300);
     mddi_host_disable_hibernation(false);
+    mutex_unlock(&panel_lock);
     return 0;
 }
 
 static int mddi_lexikon_panel_off(struct platform_device *pdev)
 {
     printk(KERN_DEBUG "[mddi] Turning off\n");
+    mutex_lock(&panel_lock);
     mddi_host_disable_hibernation(true);
-    /* set dim off for performance */
-    write_client_reg(0x0, 0x5300);
-    lexikon_adjust_backlight(LED_OFF);
-    write_client_reg(0, 0x2800);
-    write_client_reg(0, 0x1000);
+    // block all br set requests
     atomic_set(&bl_ready, 0);
+    lexikon_panel_uninit();
     mddi_host_disable_hibernation(false);
+    mutex_unlock(&panel_lock);
     return 0;
 }
 
