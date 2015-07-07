@@ -39,8 +39,6 @@ static DEFINE_MUTEX(panel_lock);
 static struct wake_lock panel_idle_lock;
 static atomic_t bl_ready = ATOMIC_INIT(1);
 static uint8_t last_val = LED_HALF;
-/* use one flag to have better backlight on/off performance */
-static int lexikon_set_dim = 0;
 
 // DRIVER_IC_CUT2 = 4
 enum {
@@ -411,8 +409,6 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     atomic_set(&bl_ready, 1);
     lexikon_adjust_backlight(LED_HALF);
     mddi_host_disable_hibernation(false);
-    /* Enable dim for next update */
-    lexikon_set_dim = 1;
     return 0;
 }
 
@@ -426,6 +422,7 @@ static int mddi_lexikon_panel_off(struct platform_device *pdev)
     write_client_reg(0, 0x2800);
     write_client_reg(0, 0x1000);
     atomic_set(&bl_ready, 0);
+    write_client_reg(0x2C, 0x5300);
     mddi_host_disable_hibernation(false);
     return 0;
 }
@@ -445,13 +442,6 @@ static unsigned int lexikon_adjust_backlight(enum led_brightness val)
         shrink_br = 54 * (val - 83) / 59 + 55;
     else
         shrink_br = 146 * (val - 142) / 113 + 109;
-
-    if (lexikon_set_dim == 1)
-    {
-        write_client_reg(0x2C, 0x5300);
-        /* we dont need set dim again */
-        lexikon_set_dim = 0;
-    }
 
     printk(KERN_DEBUG "[BL] Setting bl to %d\n", shrink_br);    
 
