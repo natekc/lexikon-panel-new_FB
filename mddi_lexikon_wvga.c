@@ -405,10 +405,10 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     mddi_host_disable_hibernation(true);
     mddi_host_client_cnt_reset();
     lexikon_panel_init();
-    atomic_set(&bl_ready, 1);
     write_client_reg(0x24, 0x5300);
     write_client_reg(0x0A, 0x22C0);
     msleep(30);
+    atomic_set(&bl_ready, 1);
     lexikon_adjust_backlight(LED_HALF);
     mddi_host_disable_hibernation(false);
     /* Enable dim for next update */
