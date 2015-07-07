@@ -399,7 +399,7 @@ static int lexikon_panel_init(void)
 
 static int mddi_lexikon_panel_on(struct platform_device *pdev)
 {
-    printk(KERN_DEBUG "[BL] Turning on\n");
+    printk(KERN_DEBUG "[mddi] Turning on\n");
     mddi_host_disable_hibernation(true);
     mddi_host_client_cnt_reset();
     lexikon_panel_init();
@@ -408,13 +408,14 @@ static int mddi_lexikon_panel_on(struct platform_device *pdev)
     msleep(30);
     atomic_set(&bl_ready, 1);
     lexikon_adjust_backlight(LED_HALF);
+    write_client_reg(0x2C, 0x5300);
     mddi_host_disable_hibernation(false);
     return 0;
 }
 
 static int mddi_lexikon_panel_off(struct platform_device *pdev)
 {
-    printk(KERN_DEBUG "[BL] Turning off\n");
+    printk(KERN_DEBUG "[mddi] Turning off\n");
     mddi_host_disable_hibernation(true);
     /* set dim off for performance */
     write_client_reg(0x0, 0x5300);
@@ -422,7 +423,6 @@ static int mddi_lexikon_panel_off(struct platform_device *pdev)
     write_client_reg(0, 0x2800);
     write_client_reg(0, 0x1000);
     atomic_set(&bl_ready, 0);
-    write_client_reg(0x2C, 0x5300);
     mddi_host_disable_hibernation(false);
     return 0;
 }
