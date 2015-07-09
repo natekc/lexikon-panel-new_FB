@@ -6,4 +6,4 @@ What works:
 
 What doesn't work:
 - Incremental backlight adjustment (sometimes device reboot)
-todo: debug ???
+cause: writing to register causes device shutdown, possible illegal address access?
